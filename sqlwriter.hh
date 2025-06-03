@@ -7,13 +7,14 @@
 #include <thread>
 #include <iostream>
 #include <map>
+#include <atomic>
 #include <optional>
 struct sqlite3;
 struct sqlite3_stmt;
 
 enum class SQLWFlag
 {
-  NoFlag, ReadOnly
+  NoFlag, ReadOnly, NoTransactions
 };
 
 
@@ -52,6 +53,8 @@ public:
   bool haveTable(const std::string& table);
   bool haveColumn(const std::string& table, const std::string &column);
 
+  static std::atomic<uint64_t> s_execs, s_sorts, s_fullscans, s_autoindexes;
+  
 private:
   sqlite3* d_sqlite;
   std::unordered_map<std::string, sqlite3_stmt*> d_stmts;
@@ -70,7 +73,7 @@ public:
 			SQLWFlag flag = SQLWFlag::NoFlag) : d_db(fname, flag), d_flag(flag)
   {
     d_db.exec("PRAGMA journal_mode='wal'");
-    if(flag != SQLWFlag::ReadOnly) {
+    if(flag != SQLWFlag::ReadOnly && flag != SQLWFlag::NoTransactions) {
       d_db.begin(); // open the transaction
       d_thread = std::thread(&SQLiteWriter::commitThread, this);
     }
